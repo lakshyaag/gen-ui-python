@@ -1,13 +1,16 @@
 import "server-only";
 import { AIProvider } from "./client";
 import { ReactNode } from "react";
-import { Runnable } from "@langchain/core/runnables";
+import { Runnable, RunnableConfig } from "@langchain/core/runnables";
 import { CompiledStateGraph } from "@langchain/langgraph";
 import { createStreamableUI, createStreamableValue } from "ai/rsc";
 import { StreamEvent } from "@langchain/core/tracers/log_stream";
 import { GithubLoading, Github } from "@/components/prebuilt/github";
 import { InvoiceLoading, Invoice } from "@/components/prebuilt/invoice";
-import { CurrentWeatherLoading, CurrentWeather } from "@/components/prebuilt/weather";
+import {
+  CurrentWeatherLoading,
+  CurrentWeather,
+} from "@/components/prebuilt/weather";
 import { AIMessage } from "@/ai/message";
 
 type ToolComponent = {
@@ -46,7 +49,9 @@ export function streamRunnableUI<RunInput, RunOutput>(
     | Runnable<RunInput, RunOutput>
     | CompiledStateGraph<RunInput, Partial<RunInput>>,
   inputs: RunInput,
+  config?: RunnableConfig
 ) {
+  console.log("streamRunnableUI", runnable, inputs, config);
   const ui = createStreamableUI();
   const [lastEvent, resolve] = withResolvers<
     Array<any> | Record<string, any>
@@ -66,6 +71,7 @@ export function streamRunnableUI<RunInput, RunOutput>(
     for await (const streamEvent of (
       runnable as Runnable<RunInput, RunOutput>
     ).streamEvents(inputs, {
+      ...config,
       version: "v1",
     })) {
       const { output, chunk } = streamEvent.data;
@@ -84,7 +90,7 @@ export function streamRunnableUI<RunInput, RunOutput>(
           if (!selectedToolComponent && !selectedToolUI) {
             selectedToolComponent = TOOL_COMPONENT_MAP[toolCall.type];
             selectedToolUI = createStreamableUI(
-              selectedToolComponent.loading(),
+              selectedToolComponent.loading()
             );
             ui.append(selectedToolUI?.value);
           }
@@ -114,7 +120,7 @@ export function streamRunnableUI<RunInput, RunOutput>(
        */
       const handleChatModelStreamEvent = (
         streamEvent: StreamEvent,
-        chunk: Record<string, any>,
+        chunk: Record<string, any>
       ) => {
         if (!callbacks[streamEvent.run_id]) {
           const textStream = createStreamableValue();
@@ -185,7 +191,7 @@ export function withResolvers<T>() {
  * @param actions
  */
 export function exposeEndpoints<T extends Record<string, unknown>>(
-  actions: T,
+  actions: T
 ): {
   (props: { children: ReactNode }): Promise<JSX.Element>;
   $$types?: T;

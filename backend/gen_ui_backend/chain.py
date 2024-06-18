@@ -1,11 +1,14 @@
-from typing import List, Optional, TypedDict
+from typing import List, Optional, TypedDict, Annotated
 
+import aiosqlite
 from langchain.output_parsers.openai_tools import JsonOutputToolsParser
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
 from langgraph.graph.graph import CompiledGraph
 
 from gen_ui_backend.tools.github import github_repo
@@ -14,6 +17,7 @@ from gen_ui_backend.tools.weather import weather_data
 
 
 class GenerativeUIState(TypedDict, total=False):
+    messages: Annotated[list, add_messages]
     input: HumanMessage
     result: Optional[str]
     """Plain text response if no tool was used."""
@@ -46,12 +50,13 @@ def invoke_model(state: GenerativeUIState, config: RunnableConfig) -> Generative
 
     if isinstance(result.tool_calls, list) and len(result.tool_calls) > 0:
         parsed_tools = tools_parser.invoke(result, config)
-        return {"tool_calls": parsed_tools}
+        return {"tool_calls": parsed_tools, "messages": result.content}
     else:
-        return {"result": str(result.content)}
+        return {"result": str(result.content), "messages": result.content}
 
 
 def invoke_tools_or_return(state: GenerativeUIState) -> str:
+    print(state)
     if "result" in state and isinstance(state["result"], str):
         return END
     elif "tool_calls" in state and isinstance(state["tool_calls"], list):
@@ -70,12 +75,16 @@ def invoke_tools(state: GenerativeUIState) -> GenerativeUIState:
     if state["tool_calls"] is not None:
         tool = state["tool_calls"][0]
         selected_tool = tools_map[tool["type"]]
+        print(f"Invoking tool: {tool['type']} with args: {tool['args']}")
         return {"tool_result": selected_tool.invoke(tool["args"])}
     else:
         raise ValueError("No tool calls found in state.")
 
 
 def create_graph() -> CompiledGraph:
+    conn = aiosqlite.connect("./database/conversations.sqlite")
+    memory = AsyncSqliteSaver(conn)
+
     workflow = StateGraph(GenerativeUIState)
 
     workflow.add_node("invoke_model", invoke_model)  # type: ignore
@@ -84,5 +93,5 @@ def create_graph() -> CompiledGraph:
     workflow.set_entry_point("invoke_model")
     workflow.set_finish_point("invoke_tools")
 
-    graph = workflow.compile()
+    graph = workflow.compile(checkpointer=memory)
     return graph

@@ -15,20 +15,28 @@ async function agent(inputs: {
   "use server";
   const remoteRunnable = new RemoteRunnable({
     url: API_URL,
-  })
-
-  return streamRunnableUI(remoteRunnable, {
-    input: [
-      ...inputs.chat_history.map(([role, content]) => ({
-        type: role,
-        content,
-      })),
-      {
-        type: "human",
-        content: inputs.input,
-      },
-    ],
   });
+
+  return streamRunnableUI(
+    remoteRunnable,
+    {
+      input: [
+        ...inputs.chat_history.map(([role, content]) => ({
+          type: role,
+          content,
+        })),
+        {
+          type: "human",
+          content: inputs.input,
+        },
+      ],
+    },
+    {
+      configurable: {
+        thread_id: 1,
+      },
+    }
+  );
 }
 
 export const EndpointsContext = exposeEndpoints({ agent });
