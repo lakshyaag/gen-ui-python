@@ -23,9 +23,11 @@ pydantic = ">=1.10.13,<2"
 rich = "^13.7.1"
 langchain-community = "^0.2.3"
 unstructured = {extras = ["all-docs"], version = "^0.13.4"}
+aiosqlite = "^0.20.0"
 
 [tool.poetry.scripts]
 start = "gen_ui_backend.server:start"
+debug = "gen_ui_backend.server:debug"
 
 [tool.poetry.group.test]
 optional = true
